@@ -1,2 +1,9 @@
 server:
     port: 8181
+
+app:
+    datasource:
+        jdbc-url: jdbc:postgresql://localhost:5432/ActivityDB
+        username: postgres
+        password: password  # change later
+        pool-size: 30

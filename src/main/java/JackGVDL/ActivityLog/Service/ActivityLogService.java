@@ -17,7 +17,7 @@ public class ActivityLogService {
 
     // Operation
     @Autowired
-    public ActivityLogService(@Qualifier("fakeDAO") ActivityLogDAO activity_log_DAO) {
+    public ActivityLogService(@Qualifier("Postgres") ActivityLogDAO activity_log_DAO) {
         this.activity_log_DAO = activity_log_DAO;
     }
 
