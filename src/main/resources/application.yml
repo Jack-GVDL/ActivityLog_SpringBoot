@@ -3,7 +3,11 @@ server:
 
 app:
     datasource:
-        jdbc-url: jdbc:postgresql://localhost:5432/ActivityDB
+        jdbc-url: jdbc:postgresql://192.168.3.10:5432/activitydb
         username: postgres
         password: password  # change later
         pool-size: 30
+
+spring:
+    flyway:
+        validate-on-migrate: false
