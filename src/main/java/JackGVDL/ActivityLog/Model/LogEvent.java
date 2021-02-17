@@ -6,6 +6,11 @@ import javax.validation.constraints.Size;
 
 public class LogEvent {
 
+    // Static Data
+    // public static final int TAG_LIST    = 0b001;
+    // public static final int TIME_START  = 0b010;
+    // public static final int TIME_END    = 0b100;
+
     // Data
     @Size(min=2, max=2)
     private int[] time_start;
@@ -41,6 +46,11 @@ public class LogEvent {
         if (event.time_start != null)   this.time_start = event.time_start;
         if (event.time_end != null)     this.time_end   = event.time_end;
         if (event.tag_list != null)     this.tag_list   = event.tag_list;
+    }
+
+    public void setTagList(String[] tag_list) {
+        if (tag_list == null) return;
+        this.tag_list = tag_list;
     }
 
     @Override

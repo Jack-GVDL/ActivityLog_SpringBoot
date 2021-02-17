@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -70,15 +71,37 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 
     @Override
     public List<LogDate> getDateList() {
-		return new ArrayList<LogDate>();
+		return _getList_Date_();
     }
 
     @Override
     public List<LogEvent> getEventByDate(int[] date) {
-		return new ArrayList<LogEvent>();
+		// get id_date
+		int id_date = _getID_Date_(date);
+		if (id_date == -1) return new ArrayList<>();
+
+		// get list of id_event
+		List<Integer> id_event_list = _getIDList_Event_(id_date);
+
+		// foreach event
+		// get its id_tag, time_start, time_end
+		List<LogEvent> result = new ArrayList<>();
+
+		for (int id_event : id_event_list) {
+			LogEvent	event		= _getEvent_(id_event);  // get LogEvent without present of tag_list
+			List<String> tag_list	= _getList_TagName_(id_event);
+
+			String[] temp = new String[tag_list.size()];
+			event.setTagList(tag_list.toArray(temp));
+
+			result.add(event);
+		}
+
+		return result;
     }
 
     // private
+	// get
 	private int _getID_Date_(int[] date) {
 		// sql
 		int 	result 		= -1;
@@ -122,6 +145,105 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return result;
 	}
 
+	private List<Integer> _getIDList_Event_(int id_date) {
+		// sql
+		final String sql = "SELECT id_event FROM LogEvent WHERE id_date=" + id_date;
+
+		// query
+		List<Integer> result = new ArrayList<>();
+		try {
+			jdbc_template.query(sql, (resultSet, i) -> {
+				result.add(resultSet.getInt("id_event"));
+				return 0;
+			});
+		} catch (Exception e) {
+			return result;
+		}
+
+		return result;
+	}
+
+	private List<LogDate> _getList_Date_() {
+		// sql
+		final String sql = "SELECT event_date FROM LogDate";
+
+		// query
+		List<LogDate> result = new ArrayList<LogDate>();
+
+		try {
+			jdbc_template.query(sql, (resultSet, i) -> {
+
+				Date d = resultSet.getDate("event_date");
+				Calendar calendar = Calendar.getInstance();
+				calendar.setTime(d);
+
+				int[] date = {
+						calendar.get(Calendar.YEAR),
+						calendar.get(Calendar.MONTH),
+						calendar.get(Calendar.DAY_OF_MONTH)};
+
+				LogDate temp = new LogDate(date);
+				result.add(temp);
+				return 0;
+			});
+		} catch (Exception e) {
+			return result;
+		}
+
+		return result;
+	}
+
+	private List<String> _getList_TagName_(int id_event) {
+		// sql
+		final String sql = "SELECT tag_name FROM Tag WHERE id_event=" + id_event;
+
+		// query
+		List<String> result = new ArrayList<>();
+
+		try {
+			jdbc_template.query(sql, (resultSet, i) -> {
+
+				// assumed: tag_name is not empty string
+				String tag_name = resultSet.getString("tag_name");
+				tag_name = tag_name.trim();
+				result.add(tag_name);
+				return 0;
+			});
+		} catch (Exception e) {
+			return result;
+		}
+
+		return result;
+	}
+
+	private LogEvent _getEvent_(int id_event) {
+		// sql
+		final String sql = "SELECT * FROM LogEvent WHERE id_event=" + id_event;
+
+		// query
+		List<LogEvent> event_list;
+
+		try {
+			event_list = jdbc_template.query(sql, (resultSet, i) -> {
+				final int[] time_start = {
+						resultSet.getInt("time_start_hour"),
+						resultSet.getInt("time_start_minute")};
+
+				final int[] time_end = {
+						resultSet.getInt("time_end_hour"),
+						resultSet.getInt("time_end_minute")};
+
+				return new LogEvent(time_start, time_end, null);
+			});
+		} catch (Exception e) {
+			return null;
+		}
+
+		if (event_list.isEmpty()) return null;
+		return event_list.get(0);
+	}
+
+	// create
 	private int _createDate_(int[] date) {
 		// sql
 		final String sql = "INSERT INTO LogDate (event_date) VALUES (" + _constructString_Date_(date) + ")";
@@ -175,6 +297,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return 0;
 	}
 
+	// destroy
 	private int _destroyEvent_(int id_event) {
 		// sql
 		final String sql = "DELETE FROM LogEvent WHERE id_event=" + id_event;
