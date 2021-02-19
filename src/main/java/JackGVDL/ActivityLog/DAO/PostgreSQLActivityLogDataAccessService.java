@@ -2,7 +2,6 @@ package JackGVDL.ActivityLog.DAO;
 
 import JackGVDL.ActivityLog.Model.LogDate;
 import JackGVDL.ActivityLog.Model.LogEvent;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
@@ -29,10 +28,10 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		// check if date exist or not
 		// if not exist
 		// then create date and get the id_date again
-		int id_date = _getID_Date_(date);
+		int id_date = _getDate_ID_(date);
 		if (id_date == -1) {
 			_createDate_(date);
-			id_date = _getID_Date_(date);
+			id_date = _getDate_ID_(date);
 		}
 
 		// create event
@@ -40,7 +39,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 
 		// ----- create tag (from tag list) -----
 		// first get id_event
-		int id_event = _getID_Event_(id_date, -1);
+		int id_event = _getEvent_ID_(id_date, -1);
 		// if (id_event == -1) return -1;
 
 		// add tag one-by-one
@@ -52,11 +51,11 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 	@Override
 	public int rmEventByIndex(int[] date, int index) {
 		// get id_date
-		int id_date = _getID_Date_(date);
+		int id_date = _getDate_ID_(date);
 		if (id_date == -1) return -1;
 
 		// get id_event
-		int id_event = _getID_Event_(id_date, index);
+		int id_event = _getEvent_ID_(id_date, index);
 		if (id_event == -1) return -1;
 
 		// remove event
@@ -66,22 +65,42 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 
     @Override
     public int configEventByIndex(int[] date, int index, LogEvent event) {
+		// ----- update event -----
+		// get id_date
+		int id_date = _getDate_ID_(date);
+		if (id_date == -1) return -1;
+
+		// get id_event
+		int id_event = _getEvent_ID_(id_date, index);
+		if (id_event == -1) return -1;
+
+		// update event
+		// where tag is not updated
+		if (_updateEvent_(id_event, event.getTimeStart(), event.getTimeEnd()) != 0) return -1;
+
+		// ----- update tag -----
+		// clear the old tag
+		_destroyTag_List_(id_event);
+
+		// add new tag
+		for (String tag_name : event.getTagList()) _createTag_(id_event, tag_name);
+
 		return -1;
     }
 
     @Override
     public List<LogDate> getDateList() {
-		return _getList_Date_();
+		return _getDate_List_();
     }
 
     @Override
     public List<LogEvent> getEventByDate(int[] date) {
 		// get id_date
-		int id_date = _getID_Date_(date);
+		int id_date = _getDate_ID_(date);
 		if (id_date == -1) return new ArrayList<>();
 
 		// get list of id_event
-		List<Integer> id_event_list = _getIDList_Event_(id_date);
+		List<Integer> id_event_list = _getEvent_ID_List_(id_date);
 
 		// foreach event
 		// get its id_tag, time_start, time_end
@@ -89,7 +108,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 
 		for (int id_event : id_event_list) {
 			LogEvent	event		= _getEvent_(id_event);  // get LogEvent without present of tag_list
-			List<String> tag_list	= _getList_TagName_(id_event);
+			List<String> tag_list	= _getTag_TagName_List_(id_event);
 
 			String[] temp = new String[tag_list.size()];
 			event.setTagList(tag_list.toArray(temp));
@@ -102,7 +121,14 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 
     // private
 	// get
-	private int _getID_Date_(int[] date) {
+	/*
+		Type			| Description				| Function Naming
+		single id		| 1 id is get				| _get{TableName}_ID_
+		multiple id		| n ids are get				| _get{TableName}_ID_List_
+		single data		| 1 row at max is get		| _get{TableName}_{ItemName: Optional}_
+		multiple data	| n rows at max are get		| _get{TableName}_List_{ItemName: Optional}_
+	*/
+	private int _getDate_ID_(int[] date) {
 		// sql
 		int 	result 		= -1;
 		final 	String sql 	= "SELECT id_date FROM LogDate WHERE event_date = " + _constructString_Date_(date);
@@ -117,7 +143,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 	}
 
 	// if index == -1, then get the back (if exist)
-	private int _getID_Event_(int id_date, int index) {
+	private int _getEvent_ID_(int id_date, int index) {
 		// sql
 		int 			result			= -1;
 		List<Integer>	id_event_list;
@@ -145,7 +171,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return result;
 	}
 
-	private List<Integer> _getIDList_Event_(int id_date) {
+	private List<Integer> _getEvent_ID_List_(int id_date) {
 		// sql
 		final String sql = "SELECT id_event FROM LogEvent WHERE id_date=" + id_date;
 
@@ -163,7 +189,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return result;
 	}
 
-	private List<LogDate> _getList_Date_() {
+	private List<LogDate> _getDate_List_() {
 		// sql
 		final String sql = "SELECT event_date FROM LogDate";
 
@@ -193,7 +219,7 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return result;
 	}
 
-	private List<String> _getList_TagName_(int id_event) {
+	private List<String> _getTag_TagName_List_(int id_event) {
 		// sql
 		final String sql = "SELECT tag_name FROM Tag WHERE id_event=" + id_event;
 
@@ -244,6 +270,10 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 	}
 
 	// create
+	/*
+		Type		| Description				| Function Naming
+		single		| 1 row at max is added		| _create{TableName}_
+	*/
 	private int _createDate_(int[] date) {
 		// sql
 		final String sql = "INSERT INTO LogDate (event_date) VALUES (" + _constructString_Date_(date) + ")";
@@ -298,6 +328,17 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 	}
 
 	// destroy
+	/*
+		Type		| Description 				| Function Naming
+		single		| 1 row at max is removed	| _destroy{TableName}_
+		multiple	| n rows at max are removed	| _destroy{TableName}_List_
+	*/
+	//
+	// - date should not be destoryed
+	// - tag will be destroyed by database if corresponding event is destroyed
+	//
+	// therefore
+	// the only thing that can be destoryed (by client side, in db perspective) is event
 	private int _destroyEvent_(int id_event) {
 		// sql
 		final String sql = "DELETE FROM LogEvent WHERE id_event=" + id_event;
@@ -312,6 +353,47 @@ public class PostgreSQLActivityLogDataAccessService implements ActivityLogDAO {
 		return 0;
 	}
 
+	private int _destroyTag_List_(int id_event) {
+		// sql
+		final String sql = "DELETE FROM Tag WHERE id_event=" + id_event;
+
+		// query
+		try {
+			jdbc_template.update(sql);
+		} catch (Exception e) {
+			return -1;
+		}
+
+		return 0;
+	}
+
+	// update
+	/*
+		Type		| Description				| Function Naming
+		single		| 1 row at max is handled	| _update{TableName}_
+	*/
+	private int _updateEvent_(int id_event, int[] time_start, int[] time_end) {
+		// sql
+		final String sql = "" +
+				"UPDATE LogEvent " +
+				"SET " +
+				"time_start_hour="  + time_start[0] + ", " +
+				"time_start_minute=" + time_start[1] + ", " +
+				"time_end_hour=" + time_end[0] +  ", " +
+				"time_end_minute=" + time_end[1] + " " +
+				"WHERE id_event=" + id_event;
+
+		// query
+		try {
+			jdbc_template.update(sql);
+		} catch (Exception e) {
+			return -1;
+		}
+
+		return 0;
+	}
+
+	// get string
 	private String _constructString_Date_(int[] date) {
 		return "\'" + date[0] + "-" + date[1] + "-" + date[2] + "\'";
 	}

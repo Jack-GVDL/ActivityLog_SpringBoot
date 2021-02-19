@@ -17,7 +17,7 @@ event_date | date (YYYYMMDD)
 
 ```sql
 CREATE TABLE LogDate (
-    id_date     INT PRIMARY KEY     NOT NULL,
+    id_date     SERIAL,
     event_date  DATE                NOT NULL
 );
 ```
@@ -33,7 +33,7 @@ time_end | time (hhmm)
 
 ```sql
 CREATE TABLE LogEvent (
-    id_event            INT PRIMARY KEY     NOT NULL,
+    id_event            SERIAL,
     id_date             INT                 NOT NULL,
     event_name          CHAR(50)            NOT NULL,
     time_start_hour     INT                 NOT NULL,
@@ -56,7 +56,7 @@ type | int (enum?)
 
 ```sql
 CREATE TABLE Tag (
-    id_tag      INT PRIMARY KEY     NOT NULL,
+    id_tag      SERIAL,
     id_event    INT                 NOT NULL,
     tag_name    CHAR(50)            NOT NULL,
     tag_type    INT                 NOT NULL,
